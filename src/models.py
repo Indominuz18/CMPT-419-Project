@@ -35,11 +35,11 @@ class CNNModel(nn.Module):
         self.bn4 = nn.BatchNorm2d(128)
         self.pool4 = nn.MaxPool2d(kernel_size=2)
         
-        # Dynamically calculate the input size for the first linear layer
-        # This would depend on the actual input size of the spectrograms
-        # For example, assuming input is [batch_size, 1, 128, 400]:
-        # After 4 pooling layers with kernel_size=2, it becomes [batch_size, 128, 8, 25]
-        self.fc1 = nn.Linear(128 * 8 * 25, 256)
+        # Use adaptive pooling to handle variable-sized inputs
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((2, 5))
+        
+        # Fixed size after adaptive pooling: 128 * 2 * 5 = 1280
+        self.fc1 = nn.Linear(128 * 2 * 5, 256)
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(256, num_classes)
     
@@ -65,14 +65,11 @@ class CNNModel(nn.Module):
         x = F.relu(self.bn4(self.conv4(x)))
         x = self.pool4(x)
         
+        # Apply adaptive pooling to get fixed size output
+        x = self.adaptive_pool(x)
+        
         # Reshape for fully connected layer
-        # Note: This assumes a fixed input size. In practice, you'd need to handle variable-sized inputs.
-        try:
-            x = x.view(x.size(0), -1)
-        except:
-            # If the input size doesn't match expectations, we'll use adaptive pooling to get a fixed size
-            x = F.adaptive_avg_pool2d(x, (8, 25))
-            x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)
         
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
