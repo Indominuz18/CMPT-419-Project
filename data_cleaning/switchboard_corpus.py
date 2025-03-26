@@ -4,6 +4,8 @@ import soundfile as sf
 import re
 import pandas as pd
 import difflib
+import glob
+import os
 
 regex = "<<(.*?)>>|<(.*?)>|(.?{.?)|(.?\[.?)|\b[A-Z]\b|[^A-Za-z0-9 .,?]+"
 
@@ -45,22 +47,19 @@ def create_csv():
 
 #create_csv()
 
-file_name = "swda_declarative.csv"
-filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
-print(filtered_utt_df)
-partition = pd.read_parquet('./data_cleaning/swda_parquet/validation-00001-of-00006.parquet', engine='fastparquet')
+###### Finding the audio data
 
 #print(partition["audio.bytes"])
 ratio_threshold = 0.6
 
 def find_audio(target_row, partition_rows):
-    target_row["match_bytes"] = ""
     if "match_ratio" in target_row:
         max_ratio = target_row["match_ratio"]
     else:
         max_ratio = ratio_threshold
         target_row["audio_path_id"] = ""
         target_row["match_transcript"] = ""
+        target_row["match_bytes"] = ""
 
     #print(max_ratio)
 
@@ -84,13 +83,29 @@ def find_audio(target_row, partition_rows):
                 max_ratio = ratio
     return target_row
     
-filtered_utt_df = filtered_utt_df.apply(lambda x: find_audio(x, partition.iterrows()), axis=1)
+file_name = "swda_declarative_subset.csv"
+filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
+#print(filtered_utt_df)
 
-audio_bytes = filtered_utt_df[["audio_path_id", "match_bytes"]]
-filtered_utt_df = filtered_utt_df.drop(['match_bytes'], axis=1)
+parquet_path = './data_cleaning/swda_parquet/'
+parquet_folder = [os.path.basename(x) for x in glob.glob(parquet_path + "*.parquet")]
 
-filtered_utt_df.to_csv("./data_cleaning/" + file_name)
-audio_bytes.to_csv("./data_cleaning/audio_bytes.csv")
+print(parquet_folder)
+
+for partition_name in parquet_folder:
+    partition = pd.read_parquet('./data_cleaning/swda_parquet/' + partition_name, engine='fastparquet')
+
+    filtered_utt_df = filtered_utt_df.apply(lambda x: find_audio(x, partition.iterrows()), axis=1)
+
+
+if "match_bytes" in filtered_utt_df:
+    audio_bytes = filtered_utt_df[["audio_path_id", "match_bytes"]]
+    filtered_utt_df_drop = filtered_utt_df.drop(['match_bytes'], axis=1)
+
+    filtered_utt_df_drop.to_csv("./data_cleaning/" + file_name)
+    audio_bytes.to_csv("./data_cleaning/audio_bytes.csv")
+else:
+    print("No new matches found")
 
 ## Unused code
 # filtered_utt_df = pd.read_csv("./data_cleaning/swda_declarative.csv")
