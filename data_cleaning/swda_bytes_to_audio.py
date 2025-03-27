@@ -3,13 +3,17 @@ import glob
 import os
 
 def convert_bytes_to_audio(row):
-    print(row)
+    #print(row)
     # with open("./data_cleaning/swda_audio/" + str(row["audio_path_id"]), mode='bw') as f:
     #     f.write(eval(row["match_bytes"]))
     with open("./data_cleaning/swda_audio/" + str(row["audio.path"]), mode='bw') as f:
-        f.write(eval(row["audio.bytes"]))
+        f.write(row["audio.bytes"])
 
 def find_audio(target_row, partition_rows):
+    if "found" in target_row:
+        if target_row["found"]:
+            return target_row
+
     audio_path = target_row["audio_path_id"]
 
     for index, row in partition_rows: 
@@ -17,6 +21,8 @@ def find_audio(target_row, partition_rows):
             convert_bytes_to_audio(row)
             print("found: " + str(row["audio.path"]))
             row["found"] = True
+            return target_row
+
     return target_row
     
 

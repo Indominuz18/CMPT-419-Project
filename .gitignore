@@ -75,3 +75,5 @@ data_cleaning/audio/Bsr001/Bsr001.interaction.wav
 data_cleaning/audio/Btr001/Btr001.interaction.wav
 data_cleaning/audio/Btr002/Btr002.interaction.wav
 data_cleaning/audio/Buw001/Buw001.interaction.wav
+/data_cleaning/swda_audio
+/data_cleaning/swda_parquet_test
