@@ -11,7 +11,8 @@ def convert_bytes_to_audio(row):
 
 def find_audio(target_row, partition_rows):
     if "found" in target_row:
-        if target_row["found"]:
+        if target_row["found"] == True:
+            #print("skipped")
             return target_row
 
     audio_path = target_row["audio_path_id"]
@@ -20,7 +21,7 @@ def find_audio(target_row, partition_rows):
         if audio_path == row["audio.path"]:
             convert_bytes_to_audio(row)
             print("found: " + str(row["audio.path"]))
-            row["found"] = True
+            target_row["found"] = True
             return target_row
 
     return target_row
