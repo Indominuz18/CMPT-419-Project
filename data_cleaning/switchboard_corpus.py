@@ -6,6 +6,7 @@ import pandas as pd
 import difflib
 import glob
 import os
+import math
 
 regex = "<<(.*?)>>|<(.*?)>|(.?{.?)|(.?\[.?)|\b[A-Z]\b|[^A-Za-z0-9 .,?]+"
 
@@ -55,11 +56,18 @@ ratio_threshold = 0.6
 def find_audio(target_row, partition_rows):
     if "match_ratio" in target_row:
         max_ratio = target_row["match_ratio"]
+
+        # row has empty ratio field
+        if math.isnan(max_ratio):
+            max_ratio = ratio_threshold
     else:
         max_ratio = ratio_threshold
-        target_row["audio_path_id"] = ""
-        target_row["match_transcript"] = ""
-        target_row["match_bytes"] = ""
+        #target_row["match_ratio"] = ratio_threshold
+        # target_row["audio_path_id"] = ""
+        # target_row["match_transcript"] = ""
+        # target_row["match_bytes"] = ""
+
+    #print(max_ratio)
 
     #print(max_ratio)
 
@@ -83,7 +91,7 @@ def find_audio(target_row, partition_rows):
                 max_ratio = ratio
     return target_row
     
-file_name = "swda_declarative_subset.csv"
+file_name = "swda_declarative.csv"
 filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
 #print(filtered_utt_df)
 
@@ -97,13 +105,12 @@ for partition_name in parquet_folder:
 
     filtered_utt_df = filtered_utt_df.apply(lambda x: find_audio(x, partition.iterrows()), axis=1)
 
-
-if "match_bytes" in filtered_utt_df:
+if "match_bytes" in filtered_utt_df.columns:
     audio_bytes = filtered_utt_df[["audio_path_id", "match_bytes"]]
     filtered_utt_df_drop = filtered_utt_df.drop(['match_bytes'], axis=1)
 
-    filtered_utt_df_drop.to_csv("./data_cleaning/" + file_name)
-    audio_bytes.to_csv("./data_cleaning/audio_bytes.csv")
+    filtered_utt_df_drop.to_csv("./data_cleaning/" + file_name, index=False)
+    audio_bytes.to_csv("./data_cleaning/audio_bytes.csv", index=False)
 else:
     print("No new matches found")
 
