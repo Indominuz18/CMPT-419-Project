@@ -5,6 +5,7 @@ Module containing model architectures for speech understanding.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 class CNNModel(nn.Module):
     """Simple CNN model for audio classification."""
@@ -222,4 +223,12 @@ if __name__ == '__main__':
     lstm_model = LSTMModel(input_dim=40, hidden_dim=256, num_classes=5)
     lstm_input = torch.randn(2, 100, 40)  # [batch_size, sequence_length, input_dim]
     lstm_output = lstm_model(lstm_input)
-    print(f"LSTM output shape: {lstm_output.shape}") 
+    print(f"LSTM output shape: {lstm_output.shape}")
+
+    # Check label distributions
+    train_labels = [batch['label'].item() for batch in train_loader.dataset]
+    val_labels = [batch['label'].item() for batch in val_loader.dataset]
+    test_labels = [batch['label'].item() for batch in test_loader.dataset]
+    print(f"Train labels: {np.bincount(train_labels)}")
+    print(f"Val labels: {np.bincount(val_labels)}")
+    print(f"Test labels: {np.bincount(test_labels)}") 

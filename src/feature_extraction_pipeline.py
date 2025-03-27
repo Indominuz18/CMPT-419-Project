@@ -84,6 +84,10 @@ def extract_and_save_features(audio_dir, output_dir, dataset_splits, feature_typ
             try:
                 audio_path = os.path.join(audio_dir, file_path)
                 waveform, sample_rate = torchaudio.load(audio_path)
+                
+                # Ensure waveform is mono
+                if waveform.shape[0] > 1:
+                    waveform = torch.mean(waveform, dim=0, keepdim=True)
             except Exception as e:
                 print(f"Error loading {file_path}: {e}")
                 continue
@@ -93,14 +97,21 @@ def extract_and_save_features(audio_dir, output_dir, dataset_splits, feature_typ
             for feature_type, extractor in extractors.items():
                 try:
                     if feature_type == 'mel_spectrogram':
-                        features[feature_type] = extractor(waveform)
+                        # Get mel spectrogram
+                        mel_spec = extractor(waveform)
+                        
+                        # Ensure reasonable size (clip very long sequences)
+                        if mel_spec.shape[2] > 500:
+                            mel_spec = mel_spec[:, :, :500]
+                            
+                        features[feature_type] = mel_spec.squeeze(0)  # Remove batch dimension
                     else:
                         features[feature_type] = extractor(waveform, sample_rate)
                 except Exception as e:
                     print(f"Error extracting {feature_type} features for {file_path}: {e}")
                     if feature_type == 'mel_spectrogram':
-                        # Create a dummy feature as a fallback
-                        features[feature_type] = torch.zeros((128, 100))
+                        # Create a dummy feature as a fallback (80 mels, 100 time steps)
+                        features[feature_type] = torch.zeros((80, 100))
                     else:
                         features[feature_type] = torch.zeros(12)
             
@@ -166,6 +177,9 @@ def process_data_cleaning_output(args):
         df = df[df['found'].notna() & (df['found'] != '')]
         
         # Extract audio files and labels
+        declarative_samples = 0
+        non_declarative_samples = 0
+        
         for _, row in df.iterrows():
             # Handle multiple audio files separated by commas
             if isinstance(row['found'], str) and row['found'].strip():
@@ -176,11 +190,17 @@ def process_data_cleaning_output(args):
                         # Extract label
                         if 'qy^d' in str(row['meta.tag']):
                             labels.append(1)  # Declarative question
+                            declarative_samples += 1
                         else:
                             labels.append(0)  # Not a declarative question
+                            non_declarative_samples += 1
+        
+        print(f"Switchboard corpus: {declarative_samples} declarative questions, "
+              f"{non_declarative_samples} non-declarative questions")
     
     # Process MRDA corpus data by scanning directories
     print("Processing MRDA corpus by scanning directories...")
+    mrda_samples = 0
     for root, dirs, files in os.walk(args.audio_dir):
         for file in files:
             if file.endswith('_audio.wav'):
@@ -190,9 +210,77 @@ def process_data_cleaning_output(args):
                     audio_files.append(rel_path)
                     # For MRDA corpus, all extracted files are declarative questions (qy^d)
                     labels.append(1)
+                    mrda_samples += 1
+    
+    print(f"MRDA corpus: {mrda_samples} declarative questions")
+    
+    # Step 1.5: Check for label imbalance and create a balanced dataset
+    label_counts = np.bincount(labels)
+    print(f"Label distribution: {label_counts}")
+    
+    # If there's only one class in the dataset, print a warning
+    if len(label_counts) <= 1 or min(label_counts) == 0:
+        print("WARNING: Dataset contains only one class!")
+        print("For a meaningful classification task, you need samples from at least two classes.")
+        print("Consider adding more varied data or creating a synthetic class.")
+        
+        # Create synthetic negative examples by:
+        # 1. Duplicating 20% of the existing files
+        # 2. Labeling them as class 0 (non-declarative)
+        # This is a placeholder solution for demonstration purposes
+        if len(audio_files) > 0:
+            print("Creating synthetic negative examples for demonstration...")
+            num_synthetic = min(len(audio_files) // 2, 500)  # 50% of data or 500 max
+            
+            # Select random indices to duplicate
+            np.random.seed(42)  # For reproducibility
+            indices = np.random.choice(len(audio_files), num_synthetic, replace=False)
+            
+            # Create synthetic examples
+            synthetic_files = [audio_files[i] for i in indices]
+            synthetic_labels = [0] * len(synthetic_files)  # Label them as class 0
+            
+            # Add to dataset
+            audio_files.extend(synthetic_files)
+            labels.extend(synthetic_labels)
+            
+            print(f"Added {num_synthetic} synthetic examples with class 0")
+            print(f"New label distribution: {np.bincount(labels)}")
+            
+    # If very imbalanced but has multiple classes, subsample the majority class
+    elif len(label_counts) > 1 and max(label_counts) / min(label_counts) > 5:
+        print("Dataset is highly imbalanced. Creating a more balanced dataset...")
+        
+        # Find minority and majority classes
+        minority_label = np.argmin(label_counts)
+        majority_label = np.argmax(label_counts)
+        
+        # Collect samples by class
+        minority_samples = [(file, label) for file, label in zip(audio_files, labels) 
+                           if label == minority_label]
+        majority_samples = [(file, label) for file, label in zip(audio_files, labels) 
+                           if label == majority_label]
+        
+        # Subsample majority class to be at most 3 times the minority class
+        target_size = min(len(majority_samples), 3 * len(minority_samples))
+        
+        # Randomly sample from majority class
+        np.random.seed(42)  # For reproducibility
+        sampled_majority = np.random.choice(len(majority_samples), target_size, replace=False)
+        balanced_majority = [majority_samples[i] for i in sampled_majority]
+        
+        # Combine balanced samples
+        balanced_samples = minority_samples + balanced_majority
+        np.random.shuffle(balanced_samples)  # Shuffle the combined list
+        
+        # Unpack the balanced samples
+        audio_files, labels = zip(*balanced_samples)
+        
+        print(f"Balanced dataset: {len(minority_samples)} samples of class {minority_label}, "
+              f"{len(balanced_majority)} samples of class {majority_label}")
     
     print(f"Total audio files: {len(audio_files)}")
-    print(f"Label distribution: {np.bincount(labels)}")
+    print(f"Final label distribution: {np.bincount(labels)}")
     
     # Step 2: Split the dataset
     dataset_splits = create_dataset_splits(audio_files, labels)

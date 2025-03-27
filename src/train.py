@@ -14,7 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
 
 from data_loader import get_data_loader, DeclarativeQuestionDataset, SLUEDataset, custom_collate_fn
 from models import get_model
@@ -76,122 +76,166 @@ class ProcessedDataset(Dataset):
             'label': data['label']
         }
 
-def prepare_features_batch(batch, feature_type='mel_spectrogram', device='cpu'):
+def prepare_features_batch(batch, feature_type='mel_spectrogram', device=None):
     """
     Prepare features batch for model input.
     
     Args:
-        batch: Batch of samples from DataLoader
+        batch: Batch from dataloader
         feature_type: Type of feature to use
         device: Device to use
         
     Returns:
-        torch.Tensor: Batch of features
-        torch.Tensor: Batch of labels
+        dict: Prepared batch with features and labels
     """
-    if isinstance(batch['features'], dict) and feature_type in batch['features']:
-        # Features are stored in a dictionary
-        features = batch['features'][feature_type].to(device)
-    elif isinstance(batch['features'][0], dict) and feature_type in batch['features'][0]:
-        # Each sample has a dictionary of features
-        features = torch.stack([sample[feature_type] for sample in batch['features']]).to(device)
+    # Get features
+    if 'features' in batch:
+        # Use preprocessed features from SLUEDataset
+        if isinstance(batch['features'], dict):
+            # If features is a dictionary, use specified feature type
+            if feature_type in batch['features']:
+                features = batch['features'][feature_type]
+            else:
+                # Fallback to first available feature type
+                feature_type = list(batch['features'].keys())[0]
+                features = batch['features'][feature_type]
+                print(f"Warning: Requested feature type '{feature_type}' not found. Using '{feature_type}' instead.")
+        else:
+            # If features is not a dictionary, use as is
+            features = batch['features']
+    elif 'waveform' in batch:
+        # Extract features from waveform (not implemented, just placeholder)
+        features = batch['waveform']
+        print("Warning: Feature extraction from waveform not fully implemented.")
     else:
-        # Features are already in the right format
-        features = batch['features'].to(device)
+        raise ValueError("No features or waveform found in batch.")
     
-    labels = batch['label'].to(device)
+    # If features is a 3D tensor (batch, freq, time), add channel dimension for CNN
+    if len(features.shape) == 3:
+        features = features.unsqueeze(1)  # (batch, 1, freq, time)
     
-    return features, labels
+    # Transfer to device
+    if device is not None:
+        features = features.to(device)
+        batch['label'] = batch['label'].to(device)
+    
+    # Add prepared features to batch
+    batch['features'] = features
+    
+    return batch
 
-def train_epoch(model, dataloader, criterion, optimizer, device, feature_type='mel_spectrogram'):
+def train_epoch(model, data_loader, optimizer, criterion, device, feature_type='mel_spectrogram'):
     """
-    Train model for one epoch.
+    Train one epoch.
     
     Args:
-        model: PyTorch model
-        dataloader: DataLoader for training data
-        criterion: Loss function
+        model: Model to train
+        data_loader: Data loader
         optimizer: Optimizer
-        device: Device to use ('cuda' or 'cpu')
+        criterion: Loss function
+        device: Device to use
         feature_type: Type of feature to use
         
     Returns:
-        float: Training loss
+        float: Average loss
     """
     model.train()
-    total_loss = 0.0
-    correct = 0
-    total = 0
+    total_loss = 0
     
-    progress_bar = tqdm(dataloader, desc='Training')
-    for batch in progress_bar:
-        features, labels = prepare_features_batch(batch, feature_type, device)
-        
-        # Zero gradients
-        optimizer.zero_grad()
+    for batch in tqdm(data_loader, desc="Training"):
+        # Prepare batch
+        batch = prepare_features_batch(batch, feature_type, device)
         
         # Forward pass
-        outputs = model(features)
-        loss = criterion(outputs, labels)
+        optimizer.zero_grad()
+        outputs = model(batch['features'])
+        loss = criterion(outputs, batch['label'])
         
-        # Backward pass and optimize
+        # Backward pass
         loss.backward()
         optimizer.step()
         
-        # Calculate accuracy
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-        
-        # Update progress bar
         total_loss += loss.item()
-        progress_bar.set_postfix({
-            'loss': total_loss / (progress_bar.n + 1),
-            'acc': 100 * correct / total
-        })
     
-    return total_loss / len(dataloader), correct / total
+    return total_loss / len(data_loader)
 
-def evaluate(model, dataloader, criterion, device, feature_type='mel_spectrogram'):
+def evaluate(model, data_loader, criterion, device, feature_type='mel_spectrogram', mode='val'):
     """
-    Evaluate model.
+    Evaluate the model.
     
     Args:
-        model: PyTorch model
-        dataloader: DataLoader for evaluation data
+        model: Model to evaluate
+        data_loader: Data loader
         criterion: Loss function
-        device: Device to use ('cuda' or 'cpu')
+        device: Device to use
         feature_type: Type of feature to use
+        mode: Evaluation mode ('val' or 'test')
         
     Returns:
-        tuple: (evaluation loss, accuracy)
+        tuple: Loss, accuracy, F1 score
     """
     model.eval()
-    total_loss = 0.0
+    total_loss = 0
     all_preds = []
     all_labels = []
     
     with torch.no_grad():
-        for batch in tqdm(dataloader, desc='Evaluating'):
-            features, labels = prepare_features_batch(batch, feature_type, device)
+        for batch in tqdm(data_loader, desc=f"Evaluating ({mode})"):
+            # Prepare batch
+            batch = prepare_features_batch(batch, feature_type, device)
             
             # Forward pass
-            outputs = model(features)
-            loss = criterion(outputs, labels)
+            outputs = model(batch['features'])
+            loss = criterion(outputs, batch['label'])
             
             # Get predictions
-            _, predicted = torch.max(outputs.data, 1)
+            _, preds = torch.max(outputs, 1)
             
-            # Save predictions and labels
-            all_preds.extend(predicted.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-            
+            # Record results
             total_loss += loss.item()
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(batch['label'].cpu().numpy())
     
-    # Calculate accuracy
-    accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
+    # Calculate metrics
+    loss = total_loss / len(data_loader)
+    accuracy = accuracy_score(all_labels, all_preds)
+    f1 = f1_score(all_labels, all_preds, average='weighted')
     
-    return total_loss / len(dataloader), accuracy, all_preds, all_labels
+    return loss, accuracy, f1
+
+def predict(model, data_loader, device, feature_type='mel_spectrogram'):
+    """
+    Make predictions with the model.
+    
+    Args:
+        model: Model to use
+        data_loader: Data loader
+        device: Device to use
+        feature_type: Type of feature to use
+        
+    Returns:
+        tuple: True labels, predicted labels
+    """
+    model.eval()
+    all_preds = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for batch in tqdm(data_loader, desc="Predicting"):
+            # Prepare batch
+            batch = prepare_features_batch(batch, feature_type, device)
+            
+            # Forward pass
+            outputs = model(batch['features'])
+            
+            # Get predictions
+            _, preds = torch.max(outputs, 1)
+            
+            # Record results
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(batch['label'].cpu().numpy())
+    
+    return all_labels, all_preds
 
 def plot_confusion_matrix(y_true, y_pred, class_names, output_dir):
     """
@@ -240,174 +284,235 @@ def save_results(y_true, y_pred, class_names, output_dir):
         class_names: List of class names
         output_dir: Directory to save results
     """
-    # Generate classification report
-    report = classification_report(y_true, y_pred, target_names=class_names, digits=4)
+    # Check unique classes in the data
+    unique_classes = np.unique(np.concatenate([y_true, y_pred]))
+    print(f"Unique classes in test set: {unique_classes}")
     
-    # Save report
-    os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, 'classification_report.txt'), 'w') as f:
-        f.write(report)
+    # Handle the case where there's only one class
+    if len(unique_classes) == 1:
+        single_class_idx = unique_classes[0]
+        single_class_name = class_names[single_class_idx]
+        
+        # Create a simple report manually
+        accuracy = np.mean(np.array(y_pred) == np.array(y_true))
+        report = f"Only one class ({single_class_name}) present in the test set.\n"
+        report += f"Accuracy: {accuracy:.4f}\n"
+        report += f"All samples belong to class: {single_class_name}"
+        
+        # Save the report
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, 'classification_report.txt'), 'w') as f:
+            f.write(report)
+        
+        # Print warning
+        print(f"WARNING: Only one class ({single_class_name}) found in the test set!")
+        print("This means your dataset is extremely imbalanced or incorrectly split.")
+        print("Try creating a more balanced dataset for meaningful evaluation.")
+    else:
+        # For multiple classes, use the normal classification report
+        try:
+            # Generate classification report
+            used_class_names = [class_names[i] for i in unique_classes]
+            report = classification_report(y_true, y_pred, target_names=used_class_names, digits=4)
+            
+            # Save report
+            os.makedirs(output_dir, exist_ok=True)
+            with open(os.path.join(output_dir, 'classification_report.txt'), 'w') as f:
+                f.write(report)
+        except ValueError as e:
+            # Fallback in case of errors
+            print(f"Error creating classification report: {e}")
+            accuracy = np.mean(np.array(y_pred) == np.array(y_true))
+            with open(os.path.join(output_dir, 'classification_report.txt'), 'w') as f:
+                f.write(f"Accuracy: {accuracy:.4f}\n")
+                f.write(f"Error generating full report: {e}")
     
-    # Plot confusion matrix
-    plot_confusion_matrix(y_true, y_pred, class_names, output_dir)
+    # Plot confusion matrix if there are multiple classes
+    if len(unique_classes) > 1:
+        plot_confusion_matrix(y_true, y_pred, 
+                              [class_names[i] for i in unique_classes], 
+                              output_dir)
 
 def train_model(args):
     """
-    Train a model.
+    Train a model for declarative question detection.
     
     Args:
         args: Command line arguments
     """
+    # Set random seed for reproducibility
+    set_seed(args.seed)
+    
     # Set device
-    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and not args.no_cuda else 'cpu')
     print(f"Using device: {device}")
     
-    # Set class names
-    class_names = args.class_names.split(',')
-    num_classes = len(class_names)
-    print(f"Classes: {class_names}")
-    
-    # Set up TensorBoard
-    writer = SummaryWriter(log_dir=os.path.join(args.output_dir, 'tensorboard'))
-    
-    # Set up data loaders
-    print("Loading data...")
-    
+    # Load data
     if args.use_processed_data:
-        # Use processed data
-        train_dataset = ProcessedDataset(args.data_dir, 'train')
-        val_dataset = ProcessedDataset(args.data_dir, 'dev')
-        test_dataset = ProcessedDataset(args.data_dir, 'test')
+        # Use processed data directory
+        train_path = os.path.join(args.data_dir, 'train_metadata.json')
+        if not os.path.exists(train_path):
+            raise ValueError(f"Processed data not found at {train_path}")
+            
+        # Load datasets
+        train_dataset = SLUEDataset(args.data_dir, 'train')
+        test_dataset = SLUEDataset(args.data_dir, 'test')
         
+        # Calculate class weights for weighted loss
+        train_labels = [item['label'] for item in train_dataset.metadata.values()]
+        class_counts = np.bincount(train_labels)
+        total_samples = len(train_labels)
+        class_weights = torch.tensor([total_samples / (len(class_counts) * count) for count in class_counts], 
+                                     dtype=torch.float32, device=device)
+        print(f"Class weights: {class_weights}")
+        
+        # Create dataloaders
         train_loader = DataLoader(
             train_dataset, 
             batch_size=args.batch_size, 
-            shuffle=True, 
-            num_workers=args.num_workers,
-            pin_memory=True,
+            shuffle=True,
             collate_fn=custom_collate_fn
         )
-        
-        val_loader = DataLoader(
-            val_dataset, 
-            batch_size=args.batch_size, 
-            shuffle=False, 
-            num_workers=args.num_workers,
-            pin_memory=True,
-            collate_fn=custom_collate_fn
-        )
-        
+        val_loader = None  # No validation set
         test_loader = DataLoader(
             test_dataset, 
             batch_size=args.batch_size, 
-            shuffle=False, 
-            num_workers=args.num_workers,
-            pin_memory=True,
+            shuffle=False,
             collate_fn=custom_collate_fn
         )
+        
+        # Print dataset statistics
+        print("Dataset statistics:")
+        print(f"Train: {len(train_dataset)} samples")
+        print(f"Test: {len(test_dataset)} samples")
+        
+        # Check label distribution
+        train_label_counts = np.bincount([item['label'] for item in train_dataset.metadata.values()])
+        test_label_counts = np.bincount([item['label'] for item in test_dataset.metadata.values()])
+        print(f"Train label distribution: {train_label_counts}")
+        print(f"Test label distribution: {test_label_counts}")
     else:
-        # Use DeclarativeQuestionDataset
-        if args.use_slue_dataset:
-            # Use original SLUE dataset (if available)
-            train_loader = get_data_loader(args.data_dir, 'train', args.batch_size, args.num_workers)
-            val_loader = get_data_loader(args.data_dir, 'dev', args.batch_size, args.num_workers)
-            test_loader = get_data_loader(args.data_dir, 'test', args.batch_size, args.num_workers)
-        else:
-            # Use DeclarativeQuestionDataset directly
-            label_map = {class_name: i for i, class_name in enumerate(class_names)}
-            train_loader = get_data_loader(
-                args.audio_dir, 
-                args.csv_path, 
-                'train', 
-                args.batch_size, 
-                args.num_workers,
-                label_map=label_map
-            )
-            val_loader = get_data_loader(
-                args.audio_dir, 
-                args.csv_path, 
-                'dev', 
-                args.batch_size, 
-                args.num_workers,
-                label_map=label_map
-            )
-            test_loader = get_data_loader(
-                args.audio_dir, 
-                args.csv_path, 
-                'test', 
-                args.batch_size, 
-                args.num_workers,
-                label_map=label_map
-            )
+        # Use raw data from data_cleaning
+        if not os.path.exists(args.csv_path):
+            raise ValueError(f"CSV file not found at {args.csv_path}")
+            
+        # Create dataloaders
+        train_loader = get_data_loader(args.audio_dir, args.csv_path, 'train', args.batch_size)
+        val_loader = get_data_loader(args.audio_dir, args.csv_path, 'dev', args.batch_size)
+        test_loader = get_data_loader(args.audio_dir, args.csv_path, 'test', args.batch_size)
+        
+        class_weights = torch.tensor([1.0, 1.0], dtype=torch.float32, device=device)
     
     # Create model
-    print(f"Creating {args.model_type} model...")
-    model = get_model(
-        args.model_type,
-        input_channels=1,
-        num_classes=num_classes
-    ).to(device)
+    if args.model_type == 'cnn':
+        model = CNN(
+            input_channels=1,
+            num_classes=args.num_classes,
+            hidden_size=args.hidden_size
+        )
+    elif args.model_type == 'transformer':
+        model = TransformerModel(
+            input_dim=80,  # Mel spectrogram features
+            hidden_dim=args.hidden_size,
+            num_classes=args.num_classes,
+            num_layers=args.num_layers,
+            nhead=args.nhead,
+            dropout=args.dropout
+        )
+    else:
+        raise ValueError(f"Unknown model type: {args.model_type}")
+    
+    # Move model to device
+    model = model.to(device)
     
     # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     
-    # Train model
-    print("Training model...")
-    best_val_acc = 0.0
-    best_model_path = os.path.join(args.output_dir, 'best_model.pt')
-    
-    for epoch in range(args.num_epochs):
-        start_time = time.time()
-        
-        # Train
-        train_loss, train_acc = train_epoch(
-            model, train_loader, criterion, optimizer, device, feature_type=args.feature_type
-        )
-        
-        # Evaluate
-        val_loss, val_acc, _, _ = evaluate(
-            model, val_loader, criterion, device, feature_type=args.feature_type
-        )
-        
-        # Save model if it's the best so far
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            torch.save(model.state_dict(), best_model_path)
-            print(f"Saved best model with validation accuracy: {val_acc:.4f}")
-        
-        # Log to TensorBoard
-        writer.add_scalar('Loss/train', train_loss, epoch)
-        writer.add_scalar('Loss/val', val_loss, epoch)
-        writer.add_scalar('Accuracy/train', train_acc, epoch)
-        writer.add_scalar('Accuracy/val', val_acc, epoch)
-        
-        # Print progress
-        print(f"Epoch {epoch+1}/{args.num_epochs} | "
-              f"Train Loss: {train_loss:.4f} | "
-              f"Train Acc: {train_acc:.4f} | "
-              f"Val Loss: {val_loss:.4f} | "
-              f"Val Acc: {val_acc:.4f} | "
-              f"Time: {time.time() - start_time:.2f}s")
-    
-    # Load best model
-    model.load_state_dict(torch.load(best_model_path))
-    
-    # Evaluate on test set
-    test_loss, test_acc, test_preds, test_labels = evaluate(
-        model, test_loader, criterion, device, feature_type=args.feature_type
+    # Define learning rate scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 
+        mode='min', 
+        factor=0.5, 
+        patience=3, 
+        verbose=True
     )
     
-    print(f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
+    # Train the model
+    best_metric = 0
+    best_model_state = None
+    train_losses = []
+    eval_metrics = []
     
-    # Save results
-    save_results(test_labels, test_preds, class_names, args.output_dir)
+    for epoch in range(args.num_epochs):
+        # Train one epoch
+        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, feature_type=args.feature_type)
+        train_losses.append(train_loss)
+        
+        # Evaluate on validation set
+        if val_loader is not None:
+            eval_loss, eval_acc, eval_f1 = evaluate(model, val_loader, criterion, device, feature_type=args.feature_type)
+            print(f"Epoch {epoch+1}/{args.num_epochs} - "
+                  f"Train loss: {train_loss:.4f}, "
+                  f"Val loss: {eval_loss:.4f}, "
+                  f"Val acc: {eval_acc:.4f}, "
+                  f"Val F1: {eval_f1:.4f}")
+            
+            # Update learning rate scheduler
+            scheduler.step(eval_loss)
+            
+            # Save best model
+            if eval_f1 > best_metric:
+                best_metric = eval_f1
+                best_model_state = model.state_dict()
+                
+            # Record metrics
+            eval_metrics.append({
+                'loss': eval_loss,
+                'accuracy': eval_acc,
+                'f1': eval_f1
+            })
+        else:
+            print(f"Epoch {epoch+1}/{args.num_epochs} - Train loss: {train_loss:.4f}")
+            
+            # Save the model after each epoch (no validation set)
+            model_path = os.path.join(args.output_dir, f'model_epoch_{epoch+1}.pt')
+            torch.save(model.state_dict(), model_path)
+    
+    # Load best model (if validation was used)
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+    
+    # Evaluate on test set
+    test_loss, test_acc, test_f1 = evaluate(model, test_loader, criterion, device, feature_type=args.feature_type)
+    print(f"Test performance - Loss: {test_loss:.4f}, Accuracy: {test_acc:.4f}, F1: {test_f1:.4f}")
     
     # Save final model
-    torch.save(model.state_dict(), os.path.join(args.output_dir, 'final_model.pt'))
+    os.makedirs(args.output_dir, exist_ok=True)
+    model_path = os.path.join(args.output_dir, 'model.pt')
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
     
-    # Close TensorBoard writer
-    writer.close()
+    # Save training results
+    results = {
+        'train_losses': train_losses,
+        'eval_metrics': eval_metrics,
+        'test_metrics': {
+            'loss': test_loss,
+            'accuracy': test_acc,
+            'f1': test_f1
+        }
+    }
+    
+    results_path = os.path.join(args.output_dir, 'training_results.json')
+    with open(results_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    # Save classification report and confusion matrix
+    y_true, y_pred = predict(model, test_loader, device)
+    save_results(y_true, y_pred, ['non-qy^d', 'qy^d'], args.output_dir)
+    
+    return model
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a model for declarative question detection")
