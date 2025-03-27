@@ -52,6 +52,7 @@ def create_csv():
 
 #print(partition["audio.bytes"])
 ratio_threshold = 0.6
+fast_mode = True
 
 def find_audio(target_row, partition_rows):
     if "match_ratio" in target_row:
@@ -60,6 +61,10 @@ def find_audio(target_row, partition_rows):
         # row has empty ratio field
         if math.isnan(max_ratio):
             max_ratio = ratio_threshold
+        else:
+            # already found a match, return
+            if fast_mode:
+                return target_row
     else:
         max_ratio = ratio_threshold
         #target_row["match_ratio"] = ratio_threshold
