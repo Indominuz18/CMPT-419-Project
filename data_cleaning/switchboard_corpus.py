@@ -50,7 +50,7 @@ def find_audio(target_row, partition_rows):
                 target_row["audio_path_id"] = row["audio.path"]
                 target_row["match_transcript"] = row["transcript"]
 
-                #target_row["match_bytes"] = row["audio.bytes"]
+                target_row["match_bytes"] = row["audio.bytes"]
                 # write audio file immediately
                 with open("./data_cleaning/swda_audio/statements/" + str(row["audio.path"]), mode='bw') as f:
                     f.write(row["audio.bytes"])
@@ -58,7 +58,7 @@ def find_audio(target_row, partition_rows):
                 max_ratio = ratio
     return target_row
     
-file_name = "swda_statements.csv"
+file_name = "swda_statements_half.csv"
 filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
 #print(filtered_utt_df)
 
