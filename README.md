@@ -53,6 +53,7 @@ pip install librosa torch numpy pandas scikit-learn matplotlib PyQt5 sounddevice
 - `main.py`: Central script to run any or all stages
 - `processed_data/`: Directory for storing extracted features
 - `models/`: Directory for storing trained models
+- `swda_audio/`: Directory for storing all the audio file for the extractor
 
 ## Usage
 
