@@ -24,6 +24,25 @@ This project implements a CNN+LSTM neural network model to classify audio clips 
   - Visualize extracted features
   - Real-time classification with confidence scores
 
+## Visualization 
+
+The project includes a dedicated visualization script for generating high-quality graphics:
+
+```
+python visualization.py
+```
+
+This will generate the following visualizations in the `visuals` directory:
+
+- **Model Architecture** (`model_architecture.png`): Visual representation of the neural network architecture
+- **Training Performance** (`training_curves.png`): Training/validation loss and F1 score plots
+- **Model Performance** (`model_performance.png`): Confusion matrix and performance metrics
+- **Feature Importance** (`feature_importance.png`): Analysis of feature contributions to classification
+- **Sample Analyses** (`sample_X_analysis.png`): Detailed visualizations of audio samples with features and predictions
+- **Prosody Analysis** (`prosody_analysis.png`): Comparison of prosodic features between questions and statements
+
+These visualizations use a consistent color scheme (purple for questions, orange for statements) and are generated at 300 DPI resolution.
+
 ## Dataset
 
 The system works with WAV audio files from the Switchboard Dialog Act (SWDA) corpus. The file naming convention is:

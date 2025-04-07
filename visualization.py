@@ -29,7 +29,7 @@ torch.manual_seed(42)
 random.seed(42)
 
 # Constants
-OUTPUT_DIR = 'pitch_visuals'
+OUTPUT_DIR = 'visuals'
 MODEL_PATH = 'models/demo_model.pth'
 MODEL_INFO_PATH = 'models/model_info.pkl'
 SAMPLE_DIR = 'swda_audio'
