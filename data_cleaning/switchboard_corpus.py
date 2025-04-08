@@ -5,9 +5,8 @@ import glob
 import os
 import math
 
-###### Finding the audio data
+###### Finding the audio data from text data in the databases
 
-#print(partition["audio.bytes"])
 ratio_threshold = 0.6
 fast_mode = True
 
@@ -29,17 +28,11 @@ def find_audio(target_row, partition_rows):
         # target_row["match_transcript"] = ""
         # target_row["match_bytes"] = ""
 
-    #print(max_ratio)
-
-    #print(max_ratio)
-
+    # find a match of transcription from annotated dataset to audio database
     for index, row in partition_rows: 
         id = row["audio.path"].split("_")[0][3:7]
-        #id = row["audio.path"]
-        #print(id)
 
         if id in str(target_row["speaker"]) or id in str(target_row["reply_to"]):
-            #print(id, target_row["speaker"], target_row["id"], target_row["reply_to"])
             mr = difflib.SequenceMatcher()
             mr.set_seqs(target_row["clean_text"], row["transcript"]) 
 
@@ -60,7 +53,6 @@ def find_audio(target_row, partition_rows):
     
 file_name = "swda_statements_half.csv"
 filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
-#print(filtered_utt_df)
 
 parquet_path = './data_cleaning/swda_parquet/'
 parquet_folder = [os.path.basename(x) for x in glob.glob(parquet_path + "*.parquet")]
@@ -73,10 +65,8 @@ for partition_name in parquet_folder:
     filtered_utt_df = filtered_utt_df.apply(lambda x: find_audio(x, partition.iterrows()), axis=1)
 
 if "match_bytes" in filtered_utt_df.columns:
-    #audio_bytes = filtered_utt_df[["audio_path_id", "match_bytes"]]
     filtered_utt_df_drop = filtered_utt_df.drop(['match_bytes'], axis=1)
 
     filtered_utt_df_drop.to_csv("./data_cleaning/" + file_name, index=False)
-    #audio_bytes.to_csv("./data_cleaning/audio_bytes.csv", index=False)
 else:
     print("No new matches found")

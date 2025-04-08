@@ -12,6 +12,7 @@ audio_folder = "./data_cleaning/swda_audio/questions/"
 filter_subfolder = "questions_filtered/"
 filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
 
+# filter questions that only have the declarative question tag qy^d at the end
 def filter_only_question(row):
     metatags = row["meta.tag"]
     if metatags[start_string_index:end_string_index] == "qy^d":

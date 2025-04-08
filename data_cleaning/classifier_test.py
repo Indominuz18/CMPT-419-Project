@@ -17,8 +17,6 @@ def predict(row):
 
     probs = F.softmax(logits, dim=1)
 
-    #print(text, probs)
-
     predicted_class = torch.argmax(probs, dim=1).item()
 
     prob_array = probs.numpy()[0]
@@ -43,9 +41,3 @@ model = AutoModelForSequenceClassification.from_pretrained("mrsinghania/asr-ques
 question_utt_df2 = question_utt_df.apply(predict, axis=1)
 stats = question_utt_df2.groupby(['class']).size()
 print("mrsinghania/asr-question-detection accuracy: " + str(stats[1] / (stats[0] + stats[1])))
-
-# plt.scatter(question_utt_df["prob_statement"], question_utt_df["prob_question"])
-# plt.title("Scatterplot of Statement Probability vs Question Probability for Sentences in the Switchboard Dataset")
-# plt.xlabel("Statement Probability (%)")
-# plt.ylabel("Question Probability (%)")
-# plt.show()

@@ -10,16 +10,15 @@ padding = 100 # milliseconds of padding between start and end
 dialogue_act_path = './data_cleaning/' + '/dialogue-acts/'
 files = [os.path.basename(x) for x in glob.glob(dialogue_act_path + "*.xml")]
 
-#print(files)
-
+# for every annotated audio file, split up the single audio file into multiple audio files containing
+# the declarative question
 for file in files:
     split_file_name = file.split(".") 
-    folder_name = split_file_name[0] #"Bed006"
-    partition = split_file_name[1] #"G"
+    folder_name = split_file_name[0]
+    partition = split_file_name[1]
     print(folder_name)
     print(partition)
 
-    # audio_file_path = "./data_cleaning/split_audio/" + folder_name + "/" + folder_name + "_" + partition + "/"
     audio_file_path = "./data_cleaning/" + processed_audio_folder + "/" + folder_name + "/"
 
     # don't process already processed audio clips
@@ -39,9 +38,7 @@ for file in files:
         else:
             continue
 
-        # checking the type
-        #if "qy^d" in dialogue_type and "^rt" not in dialogue_type:
-        #if dialogue_type == "qy^d":
+        # checking the type of question
         if "qy^d" in dialogue_type:
             # audio splitting works on milliseconds
             start_time = float(child.attrib["starttime"]) * 1000
@@ -61,5 +58,3 @@ for file in files:
                 os.makedirs(audio_file_path)
                 
             interactionAudio_split.export(audio_file_path + partition + str(i) + '_audio.wav', format="wav")
-
-            #print(start_time, end_time)
