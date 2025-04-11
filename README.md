@@ -94,16 +94,7 @@ seaborn >= 0.11.0
 ## Notes for TAs
 
 - The model is designed to work with any WAV audio samples, not just those from the SWDA corpus
-- For optimal performance, replace the `determine_label` function with your actual labeling logic using the SWDA corpus annotations
 - The demo mode will work even without training your own model, as a pre-trained model is included
-
-## Project Contributions
-
-- **Enhanced Prosodic Feature Extraction**: Implemented sophisticated analysis of pitch contours, energy patterns, and spectral features specifically optimized for question-statement discrimination
-- **Multi-Modal Deep Learning Architecture**: Developed a neural network that processes three feature streams (spectrograms, MFCCs, prosody) with specialized processing pathways and attention mechanisms
-- **Advanced Data Augmentation**: Created targeted augmentation techniques to improve model robustness and address class imbalance
-- **Interactive Real-Time Classification**: Built a PyQt5-based GUI application enabling real-time audio recording, visualization, and classification
-- **Feature Importance Visualization**: Developed visualization tools that provide interpretable insights into the acoustic features that differentiate questions from statements
 
 ## Visualization for Presentations
 
