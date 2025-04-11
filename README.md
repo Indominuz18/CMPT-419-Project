@@ -39,7 +39,6 @@ Enhancements beyond the original proposal:
 - Created more detailed feature visualizations for interpretability
 - Added data augmentation techniques specifically for question samples to address class imbalance
 
-The only limitation was in the dataset size, which required data augmentation strategies to improve model robustness.
 
 ## Dependencies
 
