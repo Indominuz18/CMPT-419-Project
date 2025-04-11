@@ -107,13 +107,13 @@ seaborn >= 0.11.0
 
 ## Visualization for Presentations
 
-The project includes a dedicated visualization script for generating high-quality graphics suitable for presentations and reports:
+The project includes a dedicated visualization script for generating graphics suitable for presentations and reports:
 
 ```
-python visualization_for_pitch.py
+python visualization.py
 ```
 
-This will generate the following visualizations in the `pitch_visuals` directory:
+This will generate the following visualizations in the `visuals` directory:
 
 - **Model Architecture** (`model_architecture.png`): Visual representation of the neural network architecture
 - **Training Performance** (`training_curves.png`): Training/validation loss and F1 score plots
@@ -208,7 +208,6 @@ This will run all three stages in sequence.
 The feature extraction stage:
 - Loads each audio file and resamples to a consistent rate
 - Extracts mel spectrograms, MFCCs, and prosodic features
-- Labels audio clips based on heuristics or annotations
 - Saves processed features to disk for training
 
 ### Model Training
@@ -228,10 +227,6 @@ The demo application:
 - Supports recording audio or loading audio files
 - Visualizes extracted features
 - Displays classification results with confidence scores
-
-## Note on Labeling
-
-In a real-world scenario, you would need ground truth labels for questions and statements. The current implementation uses a simple heuristic based on pitch rise at the end of the utterance to create labels. For optimal performance, replace the `determine_label` function with your actual labeling logic using the SWDA corpus annotations.
 
 ## Model Customization
 
