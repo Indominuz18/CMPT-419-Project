@@ -10,7 +10,7 @@ project/
 ├── feature_extractor.py     # Audio feature extraction functionality
 ├── model_trainer.py         # Neural network model training code
 ├── demo_app.py              # PyQt5 GUI application for visualization and classification
-├── visualization_for_pitch.py # Visualization tools for project presentation
+├── visualization.py # Visualization tools for project presentation
 ├── swda_audio/              # Directory for audio samples (not included)
 ├── processed_data/          # Directory for storing extracted features
 └── models/                  # Directory for storing trained models
