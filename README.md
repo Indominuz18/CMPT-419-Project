@@ -9,7 +9,7 @@ project/
 ├── main.py                  # Main entry point for running all pipeline stages
 ├── feature_extractor.py     # Audio feature extraction functionality
 ├── model_trainer.py         # Neural network model training code
-├── demo_app.py              # PyQt5 GUI application for real-time classification
+├── demo_app.py              # PyQt5 GUI application for visualization and classification
 ├── visualization_for_pitch.py # Visualization tools for project presentation
 ├── swda_audio/              # Directory for audio samples (not included)
 ├── processed_data/          # Directory for storing extracted features
@@ -20,7 +20,7 @@ project/
 
 - **Advanced Acoustic Feature Extraction**: Extracts mel spectrograms, MFCCs, and prosodic features (pitch contours, energy, rhythm, etc.)
 - **Multi-modal Deep Learning**: Uses a sophisticated neural network architecture with specialized pathways for each feature type
-- **Interactive Demo Application**: PyQt5-based GUI for real-time recording, visualization, and classification
+- **Interactive Demo Application**: PyQt5-based GUI for visualization and classification of audio files
 - **Data Augmentation**: Implements time stretching, pitch shifting, and noise addition techniques
 - **Feature Importance Visualization**: Tools for analyzing which acoustic features contribute most to classification
 
@@ -30,7 +30,7 @@ This project successfully implemented all the core components proposed:
 
 - ✅ Feature extraction pipeline for audio processing
 - ✅ Neural network architecture for multi-modal classification
-- ✅ GUI application for real-time demonstration
+- ✅ GUI application for visualization and classification
 - ✅ Comprehensive visualization tools
 
 Enhancements beyond the original proposal:
@@ -53,7 +53,6 @@ numpy >= 1.19.0
 matplotlib >= 3.3.0
 PyQt5 >= 5.15.0
 scikit-learn >= 0.24.0
-sounddevice >= 0.4.1
 soundfile >= 0.10.3
 tqdm >= 4.50.0
 pandas >= 1.1.0
@@ -87,18 +86,27 @@ seaborn >= 0.11.0
 ## Demo Application Usage
 
 1. Launch the demo: `python demo_app.py`
-2. Use the "Record" button to capture audio (or load existing samples)
-3. Visualize features using the "Extract Features" button
+2. Load audio samples using the "Load Sample" or "Load Audio File" buttons
+3. Features will be automatically extracted and visualized
 4. Classify audio using the "Classify" button
 
 ## Notes for TAs
 
 - The model is designed to work with any WAV audio samples, not just those from the SWDA corpus
+- For optimal performance, replace the `determine_label` function with your actual labeling logic using the SWDA corpus annotations
 - The demo mode will work even without training your own model, as a pre-trained model is included
+
+## Project Contributions
+
+- **Enhanced Prosodic Feature Extraction**: Implemented sophisticated analysis of pitch contours, energy patterns, and spectral features specifically optimized for question-statement discrimination
+- **Multi-Modal Deep Learning Architecture**: Developed a neural network that processes three feature streams (spectrograms, MFCCs, prosody) with specialized processing pathways and attention mechanisms
+- **Advanced Data Augmentation**: Created targeted augmentation techniques to improve model robustness and address class imbalance
+- **Interactive Classification Interface**: Built a PyQt5-based GUI application for visualization and classification of audio samples
+- **Feature Importance Visualization**: Developed visualization tools that provide interpretable insights into the acoustic features that differentiate questions from statements
 
 ## Visualization for Presentations
 
-The project includes a dedicated visualization script for generating graphics suitable for presentations and reports:
+The project includes a dedicated visualization script for generating high-quality graphics suitable for presentations and reports:
 
 ```
 python visualization.py
@@ -129,18 +137,18 @@ The system works with WAV audio files from the Switchboard Dialog Act (SWDA) cor
   - numpy, pandas, scikit-learn (for data handling and evaluation)
   - matplotlib (for visualization)
   - PyQt5 (for the GUI application)
-  - sounddevice, soundfile (for audio recording and playback)
+  - soundfile (for audio loading and playback)
 
 Install dependencies:
 ```
-pip install librosa torch numpy pandas scikit-learn matplotlib PyQt5 sounddevice soundfile tqdm
+pip install librosa torch numpy pandas scikit-learn matplotlib PyQt5 soundfile tqdm
 ```
 
 ## Project Structure
 
 - `feature_extractor.py`: Extracts and saves audio features
 - `model_trainer.py`: Trains the CNN+LSTM model on extracted features
-- `demo_app.py`: GUI application for interactive classification
+- `demo_app.py`: GUI application for visualization and classification
 - `main.py`: Central script to run any or all stages
 - `processed_data/`: Directory for storing extracted features
 - `models/`: Directory for storing trained models
@@ -179,10 +187,9 @@ python main.py demo
 ```
 
 This will launch an interactive GUI where you can:
-- Record audio or load audio files
-- View audio waveform and extracted features
-- Classify the audio as a question or statement
-- See confidence scores for the classification
+- Load audio samples using the "Load Sample" or "Load Audio File" buttons
+- Features will be automatically extracted and visualized
+- Classify audio using the "Classify" button
 
 ### Run All Stages
 
@@ -199,6 +206,7 @@ This will run all three stages in sequence.
 The feature extraction stage:
 - Loads each audio file and resamples to a consistent rate
 - Extracts mel spectrograms, MFCCs, and prosodic features
+- Labels audio clips based on heuristics or annotations
 - Saves processed features to disk for training
 
 ### Model Training
@@ -215,9 +223,13 @@ The model training stage:
 
 The demo application:
 - Provides an interactive GUI for audio classification
-- Supports recording audio or loading audio files
+- Supports loading audio samples
 - Visualizes extracted features
 - Displays classification results with confidence scores
+
+## Note on Labeling
+
+In a real-world scenario, you would need ground truth labels for questions and statements. The current implementation uses a simple heuristic based on pitch rise at the end of the utterance to create labels. For optimal performance, replace the `determine_label` function with your actual labeling logic using the SWDA corpus annotations.
 
 ## Model Customization
 

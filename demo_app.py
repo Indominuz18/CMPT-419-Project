@@ -165,38 +165,6 @@ class SimplifiedModel(nn.Module):
         output = self.fc(combined)
         return output
 
-# Recording thread
-class AudioRecorder(QThread):
-    """Thread for recording audio without blocking the GUI"""
-    finished = pyqtSignal(np.ndarray)
-    error = pyqtSignal(str)
-    
-    def __init__(self, duration=RECORDING_DURATION, sample_rate=SAMPLE_RATE, device=None):
-        super().__init__()
-        self.duration = duration
-        self.sample_rate = sample_rate
-        self.device = device
-        
-    def run(self):
-        try:
-            print(f"Recording {self.duration} seconds of audio...")
-            # Try to record using sounddevice
-            try:
-                audio = sd.rec(int(self.duration * self.sample_rate), 
-                              samplerate=self.sample_rate, 
-                              channels=1,
-                              device=self.device)
-                sd.wait()  # Wait until recording is finished
-                audio = audio.flatten()  # Flatten the array to 1D
-                self.finished.emit(audio)
-            except Exception as e:
-                # If sounddevice fails, try a more direct approach
-                print(f"Primary recording method failed: {e}")
-                self.error.emit(f"Could not record audio: {e}\nPlease use the Load Sample or Load Audio File options instead.")
-        except Exception as e:
-            print(f"Recording error: {e}")
-            self.error.emit(str(e))
-
 class SampleFilesDialog(QDialog):
     """Dialog for selecting sample audio files"""
     def __init__(self, parent=None, sample_dir='swda_audio'):
@@ -339,8 +307,6 @@ class AudioClassifierApp(QMainWindow):
         # Initialize audio and features
         self.audio = None
         self.features = None
-        self.is_recording = False
-        self.recorder = None
         
     def load_model(self):
         """Load the trained model"""
@@ -437,36 +403,10 @@ class AudioClassifierApp(QMainWindow):
         self.status_label.setFont(font)
         main_layout.addWidget(self.status_label)
         
-        # Audio device selection
-        devices_group = QGroupBox("Audio Device Selection")
-        devices_layout = QHBoxLayout()
-        devices_group.setLayout(devices_layout)
-        
-        # Device selection label
-        device_label = QLabel("Input Device:")
-        devices_layout.addWidget(device_label)
-        
-        # Device dropdown
-        self.device_combo = QComboBox()
-        devices_layout.addWidget(self.device_combo)
-        
-        # Refresh devices button
-        refresh_button = QPushButton("Refresh")
-        refresh_button.clicked.connect(self.populate_audio_devices)
-        devices_layout.addWidget(refresh_button)
-        
-        main_layout.addWidget(devices_group)
-        
         # Controls section
         controls_group = QGroupBox("Audio Controls")
         controls_layout = QHBoxLayout()
         controls_group.setLayout(controls_layout)
-        
-        # Record button
-        self.record_button = QPushButton("Record (5s)")
-        self.record_button.setFont(QFont('Arial', 10))
-        self.record_button.clicked.connect(self.toggle_recording)
-        controls_layout.addWidget(self.record_button)
         
         # Load sample button
         load_sample_button = QPushButton("Load Sample")
@@ -495,13 +435,6 @@ class AudioClassifierApp(QMainWindow):
         controls_layout.addWidget(self.play_button)
         
         main_layout.addWidget(controls_group)
-        
-        # Recording progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        main_layout.addWidget(self.progress_bar)
         
         # Features visualization section
         features_layout = QHBoxLayout()
@@ -550,7 +483,7 @@ class AudioClassifierApp(QMainWindow):
         result_layout = QVBoxLayout()
         
         # Result label
-        self.result_label = QLabel("Record or load audio to classify")
+        self.result_label = QLabel("Load audio to classify")
         self.result_label.setAlignment(Qt.AlignCenter)
         self.result_label.setFont(QFont('Arial', 14, QFont.Bold))
         result_layout.addWidget(self.result_label)
@@ -585,102 +518,6 @@ class AudioClassifierApp(QMainWindow):
         result_layout.addLayout(confidence_layout)
         result_group.setLayout(result_layout)
         main_layout.addWidget(result_group)
-        
-        # Now that all UI elements are created, populate the devices
-        self.populate_audio_devices()
-    
-    def populate_audio_devices(self):
-        """Populate the audio device dropdown with available input devices"""
-        try:
-            self.device_combo.clear()
-            devices = sd.query_devices()
-            input_devices = []
-            
-            # Add 'Default' option
-            self.device_combo.addItem("Default", None)
-            
-            # Add each input device
-            for i, device in enumerate(devices):
-                if device['max_input_channels'] > 0:
-                    name = f"{i}: {device['name']}"
-                    self.device_combo.addItem(name, i)
-                    input_devices.append(name)
-            
-            if not input_devices:
-                self.status_label.setText("No input devices found! You can only load audio files.")
-                self.record_button.setEnabled(False)
-            else:
-                self.status_label.setText(f"Found {len(input_devices)} input devices")
-                self.record_button.setEnabled(True)
-                
-        except Exception as e:
-            self.status_label.setText(f"Error loading audio devices: {e}")
-            self.record_button.setEnabled(False)
-    
-    def toggle_recording(self):
-        """Start or stop audio recording"""
-        if not self.is_recording:
-            # Start recording
-            self.is_recording = True
-            self.record_button.setText("Stop Recording")
-            self.classify_button.setEnabled(False)
-            self.play_button.setEnabled(False)
-            self.status_label.setText("Recording...")
-            
-            # Show and reset progress bar
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(0)
-            
-            # Get selected device
-            device_idx = self.device_combo.currentData()
-            
-            # Start recording thread
-            self.recorder = AudioRecorder(device=device_idx)
-            self.recorder.finished.connect(self.process_recorded_audio)
-            self.recorder.error.connect(self.handle_recording_error)
-            self.recorder.start()
-            
-            # Update progress bar
-            self.timer = QTimer()
-            self.timer.timeout.connect(self.update_progress)
-            self.timer.start(50)  # Update every 50ms
-        else:
-            # Stop recording (if it's still going)
-            if self.recorder and self.recorder.isRunning():
-                sd.stop()
-                self.recorder.wait()
-            
-            # Reset UI
-            self.record_button.setText("Record (5s)")
-            self.is_recording = False
-            self.progress_bar.setVisible(False)
-            if hasattr(self, 'timer') and self.timer.isActive():
-                self.timer.stop()
-    
-    def update_progress(self):
-        """Update the progress bar during recording"""
-        if hasattr(self, 'recorder') and self.recorder.isRunning():
-            current = self.progress_bar.value()
-            if current < 100:
-                self.progress_bar.setValue(current + 1)
-            else:
-                self.timer.stop()
-    
-    def process_recorded_audio(self, audio):
-        """Process the recorded audio"""
-        self.audio = audio
-        self.is_recording = False
-        self.record_button.setText("Record (5s)")
-        self.classify_button.setEnabled(True)
-        self.play_button.setEnabled(True)
-        self.progress_bar.setVisible(False)
-        self.status_label.setText("Audio recorded. Click 'Classify Audio' to analyze.")
-        
-        # Visualize waveform
-        self.waveform_canvas.plot_waveform(self.audio, SAMPLE_RATE)
-        
-        # Extract features
-        self.extract_and_visualize_features()
     
     def load_audio(self):
         """Load audio from a file"""
@@ -839,25 +676,6 @@ class AudioClassifierApp(QMainWindow):
         except Exception as e:
             self.status_label.setText(f"Error loading sample: {e}")
             QMessageBox.warning(self, "Error", f"Could not load sample: {e}")
-    
-    def handle_recording_error(self, error_msg):
-        """Handle recording errors"""
-        self.is_recording = False
-        self.record_button.setText("Record (5s)")
-        self.progress_bar.setVisible(False)
-        if hasattr(self, 'timer') and self.timer.isActive():
-            self.timer.stop()
-        
-        self.status_label.setText(f"Recording error: {error_msg}")
-        QMessageBox.warning(self, "Recording Error", 
-                          f"There was an error recording audio:\n{error_msg}\n\n" +
-                          "Please try one of these alternatives:\n" +
-                          "1. Use the 'Load Sample' button to select a pre-recorded audio file from the dataset\n" +
-                          "2. Use the 'Load Audio File' button to select a .wav file from your computer\n" +
-                          "3. Try a different audio device from the dropdown menu")
-        
-        # Focus on the device selection dropdown
-        self.device_combo.setFocus()
 
 if __name__ == "__main__":
     # Create application
