@@ -24,7 +24,7 @@ def find_audio(target_row, partition_rows):
     
 
 file_name = "swda_declarative_final.csv"
-filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
+filtered_utt_df = pd.read_csv("./data_cleaning/swda_csv_files/" + file_name)
 
 parquet_path = './data_cleaning/swda_parquet/'
 parquet_folder = [os.path.basename(x) for x in glob.glob(parquet_path + "*.parquet")]
@@ -36,4 +36,4 @@ for partition_name in parquet_folder:
 
     filtered_utt_df = filtered_utt_df.apply(lambda x: find_audio(x, partition.iterrows()), axis=1)
 
-filtered_utt_df.to_csv("./data_cleaning/" + file_name, index=False)
+filtered_utt_df.to_csv("./data_cleaning/swda_csv_files/" + file_name, index=False)

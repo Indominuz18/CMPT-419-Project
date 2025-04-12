@@ -37,6 +37,6 @@ def create_csv():
 
     filtered_utt_df["clean_text"] = filtered_utt_df["text"].apply(clean_text)
 
-    filtered_utt_df.to_csv("./data_cleaning/swda_statements.csv")
+    filtered_utt_df.to_csv("./data_cleaning/swda_csv_files/swda_statements.csv")
 
 create_csv()

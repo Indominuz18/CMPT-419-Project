@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 file_name = "swda_declarative_final.csv"
-question_utt_df = pd.read_csv("./data_cleaning/" + file_name)
+question_utt_df = pd.read_csv("./data_cleaning/swda_csv_files/" + file_name)
 
 def predict(row):
     text = row["clean_text"] #.replace("?", "")
@@ -27,6 +27,7 @@ def predict(row):
     # print(predicted_class)
     return row
 
+# Test off the shelf question vs statement classifiers
 tokenizer = AutoTokenizer.from_pretrained("shahrukhx01/question-vs-statement-classifier")
 model = AutoModelForSequenceClassification.from_pretrained("shahrukhx01/question-vs-statement-classifier")
 

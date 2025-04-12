@@ -52,7 +52,7 @@ def find_audio(target_row, partition_rows):
     return target_row
     
 file_name = "swda_statements_half.csv"
-filtered_utt_df = pd.read_csv("./data_cleaning/" + file_name)
+filtered_utt_df = pd.read_csv("./data_cleaning/swda_csv_files/" + file_name)
 
 parquet_path = './data_cleaning/swda_parquet/'
 parquet_folder = [os.path.basename(x) for x in glob.glob(parquet_path + "*.parquet")]
@@ -67,6 +67,6 @@ for partition_name in parquet_folder:
 if "match_bytes" in filtered_utt_df.columns:
     filtered_utt_df_drop = filtered_utt_df.drop(['match_bytes'], axis=1)
 
-    filtered_utt_df_drop.to_csv("./data_cleaning/" + file_name, index=False)
+    filtered_utt_df_drop.to_csv("./data_cleaning/swda_csv_files/" + file_name, index=False)
 else:
     print("No new matches found")

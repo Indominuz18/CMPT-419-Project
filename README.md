@@ -11,9 +11,12 @@ project/
 ├── model_trainer.py         # Neural network model training code
 ├── demo_app.py              # PyQt5 GUI application for visualization and classification
 ├── visualization.py         # Visualization tools for project presentation
-├── swda_audio/              # Directory for audio samples (not included)
+├── Col_Dataset_Anno.xlsx    # Excel file with annotations for our collected audio clips
+├── collected_dataset_audio.zip # Compressed .zip file containing all of our collected audio clip data
+├── swda_audio/              # Directory for audio samples
 ├── processed_data/          # Directory for storing extracted features
-└── models/                  # Directory for storing trained models
+├── models/                  # Directory for storing trained models
+└── data_cleaning/           # Directory for retrieving and processing audio data
 ```
 
 ## Features
@@ -39,6 +42,10 @@ Enhancements beyond the original proposal:
 - Created more detailed feature visualizations for interpretability
 - Added data augmentation techniques specifically for question samples to address class imbalance
 
+Changes from project proposal:
+- Changed dataset to use an annotated dataset with declarative questions instead of extracting them
+- Usage of text analysis and processing excluded since we have the annotated dataset already
+
 
 ## Dependencies
 
@@ -56,6 +63,9 @@ soundfile >= 0.10.3
 tqdm >= 4.50.0
 pandas >= 1.1.0
 seaborn >= 0.11.0
+convokit >= 3.0.1
+datasets >= 3.4.1
+transformers >= 4.43.3
 ```
 
 ## Installation & Usage
