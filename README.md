@@ -6,17 +6,17 @@ A deep learning system that distinguishes between question and statement utteran
 
 ```
 project/
-├── main.py                  # Main entry point for running all pipeline stages
-├── feature_extractor.py     # Audio feature extraction functionality
-├── model_trainer.py         # Neural network model training code
-├── demo_app.py              # PyQt5 GUI application for visualization and classification
-├── visualization.py         # Visualization tools for project presentation
-├── Col_Dataset_Anno.xlsx    # Excel file with annotations for our collected audio clips
+├── main.py                  	# Main entry point for running all pipeline stages
+├── feature_extractor.py     	# Audio feature extraction functionality
+├── model_trainer.py         	# Neural network model training code
+├── demo_app.py              	# PyQt5 GUI application for visualization and classification
+├── visualization.py         	# Visualization tools for project presentation
+├── Col_Dataset_Anno.xlsx    	# Excel file with annotations for our collected audio clips
 ├── collected_dataset_audio.zip # Compressed .zip file containing all of our collected audio clip data
-├── swda_audio/              # Directory for audio samples
-├── processed_data/          # Directory for storing extracted features
-├── models/                  # Directory for storing trained models
-└── data_cleaning/           # Directory for retrieving and processing audio data
+├── swda_audio/              	# Directory for audio samples from Switchboard
+├── processed_data/          	# Directory for storing extracted features
+├── models/                  	# Directory for storing trained models
+└── data_cleaning/           	# Directory for retrieving and processing audio data
 ```
 
 ## Features
@@ -136,6 +136,8 @@ These visualizations use a consistent color scheme (purple for questions, orange
 
 The system works with WAV audio files from the Switchboard Dialog Act (SWDA) corpus. The file naming convention is:
 `sw[conversation_id][speaker]_[start_time]_[end_time].wav`
+
+Our own collected dataset of audio clips are not used for the time being and are collected for understanding questions and statements.
 
 ## Prerequisites
 
